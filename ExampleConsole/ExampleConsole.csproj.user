@@ -1,6 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <StartArguments>-m livestatus -i "192.168.50.1" -p 6557 -f "C:\Users\Guest2024\Desktop\lql_test.txt" -s</StartArguments>
-  </PropertyGroup>
-</Project>
