@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 
@@ -6,7 +7,8 @@ namespace CheckMK.Livestatus
 {
     public class Livestatus : IDisposable
     {
-        public Socket Socket { get; private set; }
+
+        private Socket _socket;
 
         public string Host { get; private set; }
         public int Port { get; private set; }
@@ -40,13 +42,13 @@ namespace CheckMK.Livestatus
                     query += "OutputFormat: CSV;";
             }
 
-            // Simple validate the LQL query
-            if (!SimpleValidateLQL(query))
+            // Validate the LQL query
+            if (!ValidateLQL(query.Replace('\n', ';'), false))
                 return "Invalid query!";
 
             // Create a socket connection to the CheckMK server
-            Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            Socket.Connect(Host, Port);
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _socket.Connect(Host, Port);
 
             // Encode query into utf8 and send it to the server
             byte[] data = Encoding.UTF8.GetBytes(EncodeLQL(query));
@@ -54,11 +56,11 @@ namespace CheckMK.Livestatus
 
             while (bytesSent < data.Length)
             {
-                bytesSent += Socket.Send(data, bytesSent, data.Length - bytesSent, SocketFlags.None);
+                bytesSent += _socket.Send(data, bytesSent, data.Length - bytesSent, SocketFlags.None);
             }
 
             // We are done sending data
-            Socket.Shutdown(SocketShutdown.Send);
+            _socket.Shutdown(SocketShutdown.Send);
 
             byte[] responseBytes = new byte[4096];
             char[] responseChars = new char[4096];
@@ -67,7 +69,7 @@ namespace CheckMK.Livestatus
             // Receive bytes til there isn't (shocker)
             while (true)
             {
-                int bytesReceived = Socket.Receive(responseBytes);
+                int bytesReceived = _socket.Receive(responseBytes);
 
                 // Receiving 0 bytes means EOF has been reached
                 if (bytesReceived == 0) break;
@@ -75,13 +77,26 @@ namespace CheckMK.Livestatus
                 // Convert byteCount bytes to ASCII characters using the 'responseChars' buffer as destination
                 int charCount = Encoding.ASCII.GetChars(responseBytes, 0, bytesReceived, responseChars, 0);
 
-                response = new string(responseChars, 0, charCount).Trim();
+                response += new string(responseChars, 0, charCount).Trim();
             }
 
             // Dispose the socket, so new LQL query can be send
-            Socket.Dispose();
-            Socket = null;
+            _socket.Dispose();
+            _socket = null;
             return response;
+        }
+
+        public string ExecuteAdvancedLQL(string query)
+        {
+            string[] queries = query.Split('\n');
+
+            foreach (var item in queries)
+            {
+                if (!ValidateLQL(item, true))
+                    return "Invalid query!";
+            }
+
+            return "";
         }
 
         private string EncodeLQL(string query)
@@ -93,9 +108,9 @@ namespace CheckMK.Livestatus
             return query;
         }
 
-        private bool SimpleValidateLQL(string query)
+        private bool ValidateLQL(string query, bool advanced)
         {
-            if (query.Length == 0)
+            /*if (query.Length == 0)
                 throw new LivestatusInvalidQueryException(1, 0, "Query cannot be the length 0.");
 
             if (query.StartsWith(";") || query.StartsWith("\n"))
@@ -108,24 +123,49 @@ namespace CheckMK.Livestatus
 
             int column = 1;
 
+            bool foundMainCommand = false;
+
             // Check for empty commands
             foreach (string command in commands)
             {
                 if (command.Length == 0)
                     throw new LivestatusInvalidQueryException(1, column, "Query cannot have empty commands.");
 
+                string beginning = command.Contains(" ") ? command.Split(' ')[0] : command;
+                if (beginning.EndsWith(":"))
+                {
+                    beginning = beginning.Remove(beginning.Length - 1, 1);
+                }
+
+                if (!ALLOWED_BEGINNINGS.Contains(beginning))
+                {
+                    throw new LivestatusInvalidQueryException(1, column, $"Invalid command beginning: {beginning}");
+                }
+
+                if (beginning == "GET")
+                {
+                    if (foundMainCommand)
+                        throw new LivestatusInvalidQueryException(1, column, "Multiple GET's aren't allowed.");
+                    foundMainCommand = true;
+                }
+
                 column += command.Length + 1;
-            }
+            }*/
+
+            QueryValidator validator = new QueryValidator(advanced);
+
+            if (!validator.Validate(query))
+                return false;
 
             return true;
         }
 
         public void Dispose()
         {
-            if (Socket != null)
+            if (_socket != null)
             {
-                Socket.Dispose();
-                Socket = null;
+                _socket.Dispose();
+                _socket = null;
             }
         }
     }

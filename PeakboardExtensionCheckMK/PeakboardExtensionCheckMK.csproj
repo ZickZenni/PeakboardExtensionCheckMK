@@ -70,6 +70,9 @@
     <Compile Include="CheckMKExtension.cs" />
     <Compile Include="CheckMK\Livestatus\LivestatusInvalidQueryException.cs" />
     <Compile Include="CheckMK\Livestatus\LQLOutputFormat.cs" />
+    <Compile Include="CheckMK\Livestatus\QueryValidator.cs" />
+    <Compile Include="CheckMK\Livestatus\Validators\KeywordValidator.cs" />
+    <Compile Include="CheckMK\Livestatus\Validators\SimpleQueryValidator.cs" />
     <Compile Include="JsonContent.cs" />
     <Compile Include="CheckMK\Livestatus\Livestatus.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
